@@ -34,7 +34,9 @@ PHONE = os.getenv("PHONE_NUMBER", "")
 DATA_DIR = os.getenv("DATA_DIR", "./data")
 SESSION_PATH = os.path.join(DATA_DIR, "user")
 
-RESULT_FILE = "result.txt"
+# Получить путь к папке Downloads
+DOWNLOADS_DIR = os.path.join(os.path.expanduser("~"), "Downloads")
+RESULT_FILE = os.path.join(DOWNLOADS_DIR, "result.txt")
 
 # ---------------- Helpers ----------------
 def ensure_data_dir():
@@ -145,7 +147,6 @@ async def parse_channel_from_date(channel_id: int, start_date: datetime):
     logger.info(f"Parsing messages from channel {channel_id} from {start_date.strftime('%d.%m.%Y')} to today")
     
     messages_with_text = []
-    today = datetime.now().replace(hour=23, minute=59, second=59, microsecond=999999)
     
     try:
         async for message in app.get_chat_history(channel_id):
@@ -153,10 +154,6 @@ async def parse_channel_from_date(channel_id: int, start_date: datetime):
             if message.date and message.date < start_date:
                 logger.info(f"Reached start date, stopping parsing")
                 break
-            
-            # Check if message date is after today (shouldn't happen, but safety check)
-            if message.date and message.date > today:
-                continue
             
             # Extract plain text
             text = extract_plain_text(message)
@@ -166,9 +163,10 @@ async def parse_channel_from_date(channel_id: int, start_date: datetime):
                 continue
             
             # Store message with its date for sorting
+            # Use start_date as fallback to ensure proper sorting if date is missing
             messages_with_text.append({
                 'text': text,
-                'date': message.date if message.date else datetime.now()
+                'date': message.date if message.date else start_date
             })
             
             logger.info(f"Parsed message {message.id} from {message.date.strftime('%d.%m.%Y %H:%M') if message.date else 'unknown'}")
@@ -187,24 +185,22 @@ async def parse_channel_from_date(channel_id: int, start_date: datetime):
 
 def save_to_file(messages: list, filename: str):
     """
-    Save messages to file, each separated by '---'.
+    Save messages to file, each separated by '---' after each post.
     Messages should be sorted newest first.
-    Format: ---\n\n<text>\n\n---
+    Format: <text>\n\n---
     """
     logger.info(f"Saving {len(messages)} messages to {filename}")
     
+    # Ensure Downloads directory exists
+    os.makedirs(os.path.dirname(filename), exist_ok=True)
+    
     with open(filename, 'w', encoding='utf-8') as f:
-        for i, msg_data in enumerate(messages):
-            # Write separator before each message (except before first)
-            if i > 0:
-                f.write("\n")
-            f.write("---\n\n")
-            
+        for msg_data in messages:
             # Write message text
             f.write(msg_data['text'])
             
             # Write separator after message
-            f.write("\n\n---")
+            f.write("\n\n---\n\n")
     
     logger.info(f"Successfully saved messages to {filename}")
 
@@ -214,9 +210,7 @@ def remove_session_files(session_path: str):
     Remove session files that Pyrogram may create.
     """
     candidates = [
-        session_path,
         session_path + ".session",
-        session_path + "-journal",
         session_path + ".session-journal",
     ]
     for p in candidates:
@@ -230,14 +224,10 @@ def remove_session_files(session_path: str):
 def parse_date(date_str: str) -> datetime:
     """
     Parse date from DD.MM.YYYY format.
-    Returns datetime object set to 00:00:00 UTC of that day.
-    Pyrogram message dates are in UTC, so we use UTC for consistency.
+    Returns datetime object set to 00:00:00 of that day.
     """
     try:
-        # Parse as local date, then convert to UTC (naive UTC datetime)
-        # For simplicity, we'll treat it as UTC directly since Telegram uses UTC
         dt = datetime.strptime(date_str, "%d.%m.%Y")
-        # Return as naive UTC datetime (Pyrogram uses naive UTC datetimes)
         return dt.replace(hour=0, minute=0, second=0, microsecond=0)
     except ValueError:
         raise ValueError(f"Invalid date format. Expected DD.MM.YYYY, got: {date_str}")
@@ -252,6 +242,17 @@ def create_event_loop_and_run(coro):
     try:
         return loop.run_until_complete(coro)
     finally:
+        # Give pending tasks a chance to complete
+        try:
+            pending = asyncio.all_tasks(loop)
+            if pending:
+                # Cancel all pending tasks
+                for task in pending:
+                    task.cancel()
+                # Wait for cancellation to complete (ignore exceptions)
+                loop.run_until_complete(asyncio.gather(*pending, return_exceptions=True))
+        except Exception:
+            pass
         # shutdown async generators cleanly
         try:
             loop.run_until_complete(loop.shutdown_asyncgens())
@@ -262,13 +263,18 @@ def create_event_loop_and_run(coro):
 async def main_async():
     # Ensure data directory exists
     ensure_data_dir()
-    
+
     # AUTH mode: delete session and perform auth, then exit
     if len(sys.argv) > 1 and sys.argv[1] == "auth":
         remove_session_files(SESSION_PATH)
         logger.info("Starting authorization (interactive). Follow prompts in stdout/stderr.")
         await app.start()
         logger.info("Authorization completed (session saved). Stopping client.")
+        try:
+            await app.stop()
+            await asyncio.sleep(0.5)
+        except Exception:
+            pass
         return
 
     # PARSE mode (default): parse channel from date
@@ -323,7 +329,13 @@ async def main_async():
         logger.info(f"Parsing completed. Results saved to {RESULT_FILE}")
     
     finally:
-        await app.stop()
+        try:
+            logger.info("Stopping client...")
+            await app.stop()
+            # Give a small delay for cleanup
+            await asyncio.sleep(0.5)
+        except Exception as e:
+            logger.warning(f"Error during client shutdown: {e}")
 
 if __name__ == "__main__":
     # Run main_async in a fresh event loop to avoid cross-loop issues.
