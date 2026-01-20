@@ -34,10 +34,7 @@ Create a `.env` file in the project root with your Telegram API credentials:
 API_ID=your_api_id
 API_HASH=your_api_hash
 PHONE_NUMBER=+1234567890
-DATA_DIR=./data
 ```
-
-The `DATA_DIR` is optional and defaults to `./data` where session files are stored.
 
 ## Usage
 
@@ -56,51 +53,49 @@ You'll be prompted to enter the verification code sent to your phone. The sessio
 Basic usage with required channel argument:
 
 ```bash
-python userbot.py @channel_name
+python userbot.py https://t.me/channel_name
 ```
 
 Parse with date range:
 
 ```bash
-python userbot.py @channel_name -s 01.01.2024 -e 31.01.2024
+python userbot.py -s 01.01.2024 -e 31.01.2024 https://t.me/channel_name
 ```
 
 Remove links from extracted text:
 
 ```bash
-python userbot.py @channel_name --no-links
+python userbot.py --no-links https://t.me/channel_name
 ```
 
 Limit number of messages:
 
 ```bash
-python userbot.py @channel_name -l 100
+python userbot.py -l 100 https://t.me/channel_name
 ```
 
 Export as JSON:
 
 ```bash
-python userbot.py @channel_name -f json
+python userbot.py -f json https://t.me/channel_name
 ```
 
 Custom output filename:
 
 ```bash
-python userbot.py @channel_name -o my_export
+python userbot.py -o my_export https://t.me/channel_name
 ```
 
 Combine options:
 
 ```bash
-python userbot.py https://t.me/channel_name -s 01.01.2024 -e 31.12.2024 --no-links -f json -o export_2024
+python userbot.py -s 01.01.2024 -e 31.12.2024 --no-links -f json -o export_2024 https://t.me/channel_name
 ```
 
 ## Command Line Arguments
 
 - `channel` - Channel identifier (required, except for auth mode). Accepts:
   - Channel URLs: `https://t.me/channel_name`
-  - Usernames: `@channel_name`
-  - Numeric IDs: `-1001234567890`
 
 - `-s, --start` - Start date in DD.MM.YYYY format (default: 01.01.1970)
 - `-e, --end` - End date in DD.MM.YYYY format (default: current date)
