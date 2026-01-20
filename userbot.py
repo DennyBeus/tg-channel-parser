@@ -4,21 +4,17 @@ import sys
 import re
 import asyncio
 import logging
+import json
+import argparse
+        
 from datetime import datetime
 
 # Загрузить переменные из .env файла
 try:
     from dotenv import load_dotenv
-    load_dotenv()  # Загружает переменные из .env файла
+    load_dotenv()
 except ImportError:
-    pass  # Если python-dotenv не установлен, используем только системные переменные
-
-# Установить event loop ДО импорта Pyrogram (для Python 3.14+)
-try:
-    loop = asyncio.get_event_loop()
-except RuntimeError:
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
+    pass
 
 from pyrogram import Client
 
@@ -30,314 +26,126 @@ logger = logging.getLogger(__name__)
 API_ID = int(os.getenv("API_ID", "0"))
 API_HASH = os.getenv("API_HASH", "")
 PHONE = os.getenv("PHONE_NUMBER", "")
-# session file path requested by you:
 DATA_DIR = os.getenv("DATA_DIR", "./data")
 SESSION_PATH = os.path.join(DATA_DIR, "user")
-
-# Получить путь к папке Downloads
 DOWNLOADS_DIR = os.path.join(os.path.expanduser("~"), "Downloads")
-RESULT_FILE = os.path.join(DOWNLOADS_DIR, "result.txt")
-
-# ---------------- Helpers ----------------
-def ensure_data_dir():
-    """Создать директорию для данных, если её нет"""
-    os.makedirs(DATA_DIR, exist_ok=True)
 
 # ---------------- Text processing ----------------
 def remove_links(text: str) -> str:
-    """
-    Remove all links from text while preserving the rest of the content.
-    Handles various link formats: http://, https://, t.me/, @username, etc.
-    Preserves line breaks in the text.
-    """
-    if not text:
-        return ""
-    
-    # Remove URLs (http://, https://) - match until space, newline, or end of string
+    if not text: return ""
     text = re.sub(r'https?://[^\s\n\)]+', '', text)
-    
-    # Remove t.me links (with or without protocol)
     text = re.sub(r'[^\s\n]*t\.me/[^\s\n\)]+', '', text)
-    
-    # Remove @mentions/usernames (these are typically links in Telegram)
     text = re.sub(r'@[\w]+', '', text)
-    
-    # Clean up multiple spaces (but preserve single spaces and newlines)
     text = re.sub(r'[ \t]+', ' ', text)
-    
-    # Clean up spaces at the start/end of lines
-    lines = text.split('\n')
-    lines = [line.strip() for line in lines]
+    lines = [line.strip() for line in text.split('\n')]
     text = '\n'.join(lines)
-    
-    # Remove empty lines (more than 2 consecutive newlines)
-    text = re.sub(r'\n{3,}', '\n\n', text)
-    
-    return text.strip()
+    return re.sub(r'\n{3,}', '\n\n', text).strip()
 
 def extract_plain_text(message) -> str:
-    """
-    Extract plain text from message, removing links.
-    Returns empty string if message has no text.
-    In Pyrogram, message.text and message.caption are already plain text strings.
-    """
-    text = ""
-    if message.text:
-        # message.text is already a plain text string
-        text = message.text
-    elif message.caption:
-        # message.caption is already a plain text string
-        text = message.caption
-    
-    if not text:
-        return ""
-    
-    # Remove links
-    text = remove_links(text)
-    
-    return text
+    text = message.text or message.caption or ""
+    return remove_links(text) if text else ""
 
 # ---------------- Pyrogram client ----------------
-# Note: pass SESSION_PATH as session name; Pyrogram will create the file there.
-app = Client(
-    SESSION_PATH,
-    api_id=API_ID,
-    api_hash=API_HASH,
-    phone_number=PHONE,
-    # workers default is fine; we keep single event loop handling
-)
+app = Client(SESSION_PATH, api_id=API_ID, api_hash=API_HASH, phone_number=PHONE)
 
-# ---------------- Channel resolver ----------------
 async def resolve_channel(app_client: Client, channel_raw: str):
-    """
-    Resolve channel from URL or username to chat ID.
-    Returns chat ID or None if failed.
-    """
-    if not channel_raw:
-        return None
-    
-    channel_raw = channel_raw.strip()
-    
-    # numeric id
-    if channel_raw.startswith("-100") or channel_raw.startswith("-"):
-        try:
-            chat_id = int(channel_raw)
-            logger.info(f"Chat ID added directly: {channel_raw}")
-            return chat_id
-        except ValueError:
-            logger.error(f"Invalid numeric ID: {channel_raw}")
-            return None
-
-    # Clean URL: remove https://t.me/, http://t.me/, @
     clean = channel_raw.replace("https://t.me/", "").replace("http://t.me/", "").replace("@", "").strip()
     try:
         chat = await app_client.get_chat(clean)
-        logger.info(f"Resolved: {clean} → ID {chat.id}")
         return chat.id
     except Exception as e:
         logger.error(f"Failed to resolve {channel_raw}: {e}")
         return None
 
-# ---------------- Parse channel from date ----------------
-async def parse_channel_from_date(channel_id: int, start_date: datetime):
-    """
-    Parse all messages from channel starting from start_date to today.
-    Returns list of text messages sorted by date (newest first).
-    """
-    logger.info(f"Parsing messages from channel {channel_id} from {start_date.strftime('%d.%m.%Y')} to today")
+# ---------------- Core Parsing Logic ----------------
+async def parse_channel(channel_id: int, start_date: datetime, end_date: datetime, limit: int):
+    messages_data = []
+    count = 0
     
-    messages_with_text = []
+    logger.info(f"Parsing from {start_date.date()} to {end_date.date()} (Limit: {limit or 'None'})")
     
-    try:
-        async for message in app.get_chat_history(channel_id):
-            # Check if message date is before start_date, stop if so
-            if message.date and message.date < start_date:
-                logger.info(f"Reached start date, stopping parsing")
-                break
+    async for message in app.get_chat_history(channel_id):
+        # Проверка лимита
+        if limit and count >= limit:
+            break
             
-            # Extract plain text
-            text = extract_plain_text(message)
-            
-            # Skip messages without text
-            if not text:
-                continue
-            
-            # Store message with its date for sorting
-            # Use start_date as fallback to ensure proper sorting if date is missing
-            messages_with_text.append({
+        # Проверка дат
+        msg_date = message.date
+        if msg_date < start_date:
+            break
+        if msg_date > end_date:
+            continue
+
+        text = extract_plain_text(message)
+        if text:
+            messages_data.append({
                 'text': text,
-                'date': message.date if message.date else start_date
+                'date': msg_date.strftime("%d.%m.%Y %H:%M:%S")
             })
-            
-            logger.info(f"Parsed message {message.id} from {message.date.strftime('%d.%m.%Y %H:%M') if message.date else 'unknown'}")
-            
-            # Small throttle to avoid rate limiting
-            await asyncio.sleep(0.1)
-    
-    except Exception as e:
-        logger.error(f"Error parsing channel {channel_id}: {e}")
-    
-    # Sort by date descending (newest first)
-    messages_with_text.sort(key=lambda x: x['date'], reverse=True)
-    
-    logger.info(f"Parsed {len(messages_with_text)} messages with text")
-    return messages_with_text
+            count += 1
+            if count % 50 == 0: logger.info(f"Parsed {count} messages...")
 
-def save_to_file(messages: list, filename: str):
-    """
-    Save messages to file, each separated by '---' after each post.
-    Messages should be sorted newest first.
-    Format: <text>\n\n---
-    """
-    logger.info(f"Saving {len(messages)} messages to {filename}")
+    return messages_data
+
+def save_results(messages: list, filename: str, fmt: str):
+    # Если передан только имя файла, сохраняем в Downloads
+    if not os.path.isabs(filename) and os.sep not in filename:
+        full_path = os.path.join(DOWNLOADS_DIR, f"{filename}.{fmt}")
+    else:
+        full_path = filename if filename.endswith(fmt) else f"{filename}.{fmt}"
+
+    os.makedirs(os.path.dirname(full_path), exist_ok=True)
+
+    if fmt == 'json':
+        with open(full_path, 'w', encoding='utf-8') as f:
+            json.dump(messages, f, ensure_ascii=False, indent=4)
+    else:
+        with open(full_path, 'w', encoding='utf-8') as f:
+            for m in messages:
+                f.write(f"{m['text']}\n\n---\n\n")
     
-    # Ensure Downloads directory exists
-    os.makedirs(os.path.dirname(filename), exist_ok=True)
-    
-    with open(filename, 'w', encoding='utf-8') as f:
-        for msg_data in messages:
-            # Write message text
-            f.write(msg_data['text'])
-            
-            # Write separator after message
-            f.write("\n\n---\n\n")
-    
-    logger.info(f"Successfully saved messages to {filename}")
+    logger.info(f"Saved {len(messages)} items to {full_path}")
 
-# ---------------- Entry point ----------------
-def remove_session_files(session_path: str):
-    """
-    Remove session files that Pyrogram may create.
-    """
-    candidates = [
-        session_path + ".session",
-        session_path + ".session-journal",
-    ]
-    for p in candidates:
-        try:
-            if os.path.exists(p):
-                os.remove(p)
-                logger.info(f"Removed session file: {p}")
-        except Exception as e:
-            logger.warning(f"Could not remove {p}: {e}")
+# ---------------- Execution ----------------
+async def main():
+    parser = argparse.ArgumentParser(description="Telegram Channel Parser CLI")
+    parser.add_argument("channel", nargs='?', help="Channel URL or @username")
+    parser.add_argument("-s", "--start", help="Start date DD.MM.YYYY", default="01.01.1970")
+    parser.add_argument("-e", "--end", help="End date DD.MM.YYYY", default=None)
+    parser.add_argument("-o", "--output", help="Output filename", default="result")
+    parser.add_argument("-f", "--format", choices=['txt', 'json'], default='txt', help="Output format")
+    parser.add_argument("-l", "--limit", type=int, help="Max messages to parse")
+    parser.add_argument("--auth", action="store_true", help="Run authorization mode")
 
-def parse_date(date_str: str) -> datetime:
-    """
-    Parse date from DD.MM.YYYY format.
-    Returns datetime object set to 00:00:00 of that day.
-    """
-    try:
-        dt = datetime.strptime(date_str, "%d.%m.%Y")
-        return dt.replace(hour=0, minute=0, second=0, microsecond=0)
-    except ValueError:
-        raise ValueError(f"Invalid date format. Expected DD.MM.YYYY, got: {date_str}")
+    args = parser.parse_args()
 
-def create_event_loop_and_run(coro):
-    """
-    Create a dedicated event loop and run the coroutine.
-    This avoids "attached to a different loop" issues.
-    """
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-    try:
-        return loop.run_until_complete(coro)
-    finally:
-        # Give pending tasks a chance to complete
-        try:
-            pending = asyncio.all_tasks(loop)
-            if pending:
-                # Cancel all pending tasks
-                for task in pending:
-                    task.cancel()
-                # Wait for cancellation to complete (ignore exceptions)
-                loop.run_until_complete(asyncio.gather(*pending, return_exceptions=True))
-        except Exception:
-            pass
-        # shutdown async generators cleanly
-        try:
-            loop.run_until_complete(loop.shutdown_asyncgens())
-        except Exception:
-            pass
-        loop.close()
-
-async def main_async():
-    # Ensure data directory exists
-    ensure_data_dir()
-
-    # AUTH mode: delete session and perform auth, then exit
-    if len(sys.argv) > 1 and sys.argv[1] == "auth":
-        remove_session_files(SESSION_PATH)
-        logger.info("Starting authorization (interactive). Follow prompts in stdout/stderr.")
+    if args.auth:
         await app.start()
-        logger.info("Authorization completed (session saved). Stopping client.")
-        try:
-            await app.stop()
-            await asyncio.sleep(0.5)
-        except Exception:
-            pass
+        print("Successfully authorized!")
+        await app.stop()
         return
 
-    # PARSE mode (default): parse channel from date
-    logger.info("Starting channel parser")
-    
-    # Request channel URL
-    print("\nEnter Telegram channel URL (e.g., https://t.me/channel_name):")
-    channel_url = input().strip()
-    
-    if not channel_url:
-        logger.error("Channel URL is required")
+    if not args.channel:
+        parser.print_help()
         return
+
+    # Обработка дат
+    start_dt = datetime.strptime(args.start, "%d.%m.%Y")
+    end_dt = datetime.strptime(args.end, "%d.%m.%Y") if args.end else datetime.now()
+
+    os.makedirs(DATA_DIR, exist_ok=True)
     
-    # Request start date
-    print("\nEnter start date in format DD.MM.YYYY:")
-    date_str = input().strip()
-    
-    if not date_str:
-        logger.error("Start date is required")
-        return
-    
-    try:
-        start_date = parse_date(date_str)
-    except ValueError as e:
-        logger.error(str(e))
-        return
-    
-    logger.info(f"Parsing channel: {channel_url}")
-    logger.info(f"Start date: {start_date.strftime('%d.%m.%Y')}")
-    
-    # Start client
     await app.start()
-    logger.info("Client started")
-    
     try:
-        # Resolve channel
-        channel_id = await resolve_channel(app, channel_url)
-        if not channel_id:
-            logger.error(f"Cannot resolve channel: {channel_url}")
-            return
-        
-        # Parse messages
-        messages = await parse_channel_from_date(channel_id, start_date)
-        
-        if not messages:
-            logger.warning("No messages found with text in the specified date range")
-            return
-        
-        # Save to file
-        save_to_file(messages, RESULT_FILE)
-        
-        logger.info(f"Parsing completed. Results saved to {RESULT_FILE}")
-    
+        channel_id = await resolve_channel(app, args.channel)
+        if channel_id:
+            results = await parse_channel(channel_id, start_dt, end_dt, args.limit)
+            if results:
+                save_results(results, args.output, args.format)
+            else:
+                logger.warning("No messages found.")
     finally:
-        try:
-            logger.info("Stopping client...")
-            await app.stop()
-            # Give a small delay for cleanup
-            await asyncio.sleep(0.5)
-        except Exception as e:
-            logger.warning(f"Error during client shutdown: {e}")
+        await app.stop()
 
 if __name__ == "__main__":
-    # Run main_async in a fresh event loop to avoid cross-loop issues.
-    create_event_loop_and_run(main_async())
-
+    asyncio.run(main())
