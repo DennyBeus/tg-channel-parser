@@ -37,54 +37,76 @@ SESSION_PATH = os.path.join(DATA_DIR, "user")
 DOWNLOADS_DIR = os.path.join(os.path.expanduser("~"), "Downloads")
 
 # ---------------- Text processing ----------------
-def remove_links(text: str) -> str:
-    """Удаляет ссылки и упоминания из текста"""
-    if not text: return ""
-    # Удаление URL
-    text = re.sub(r'https?://[^\s\n\)]+', '', text)
-    # Удаление t.me ссылок
-    text = re.sub(r'[^\s\n]*t\.me/[^\s\n\)]+', '', text)
-    # Удаление @usernames
-    text = re.sub(r'@[\w]+', '', text)
-    # Очистка лишних пробелов и пустых строк
+def normalize_whitespace(text: str) -> str:
+    """Очистка лишних пробелов и пустых строк (всегда при парсинге)."""
+    if not text:
+        return ""
     text = re.sub(r'[ \t]+', ' ', text)
     lines = [line.strip() for line in text.split('\n')]
     text = '\n'.join(lines)
     return re.sub(r'\n{3,}', '\n\n', text).strip()
 
+
+def remove_links(text: str) -> str:
+    """Удаляет ссылки из текста (URL и t.me)."""
+    if not text:
+        return ""
+    text = re.sub(r'https?://[^\s\n\)]+', '', text)
+    text = re.sub(r'[^\s\n]*t\.me/[^\s\n\)]+', '', text)
+    return text
+
+
+def remove_emoji(text: str) -> str:
+    """Удаляет эмодзи из текста."""
+    if not text:
+        return ""
+    emoji_pattern = re.compile(
+        "["
+        "\U0001F600-\U0001F64F"
+        "\U0001F300-\U0001F5FF"
+        "\U0001F680-\U0001F6FF"
+        "\U0001F1E0-\U0001F1FF"
+        "\U00002702-\U000027B0"
+        "\U000024C2-\U0001F251"
+        "\U0001F900-\U0001F9FF"
+        "]+",
+        flags=re.UNICODE,
+    )
+    return emoji_pattern.sub("", text)
+
 # ---------------- Core Parsing Logic ----------------
-async def parse_channel(app: Client, channel_id: int, start_date: datetime, end_date: datetime, limit: int, no_links: bool):
+async def parse_channel(app: Client, channel_id: int, start_date: datetime, end_date: datetime, limit: int, no_links: bool, no_emoji: bool):
     messages_data = []
     count = 0
-    
-    logger.info(f"Parsing channel {channel_id} (Limit: {limit or 'None'}, No-Links: {no_links})")
-    
+
+    logger.info(f"Parsing channel {channel_id} (Limit: {limit or 'None'}, No-Links: {no_links}, No-Emoji: {no_emoji})")
+
     async for message in app.get_chat_history(channel_id):
         if limit and count >= limit:
             break
-            
+
         msg_date = message.date
         if msg_date < start_date:
             break
         if msg_date > end_date:
             continue
 
-        # Извлечение текста (из сообщения или описания медиа)
         text = message.text or message.caption or ""
-        
+
         if text:
-            # Если флаг --no-links активен, удаляем ссылки
             if no_links:
                 text = remove_links(text)
-            
-            # Если после удаления ссылок текст остался (или ссылки не удаляли)
+            text = normalize_whitespace(text)
+            if no_emoji:
+                text = remove_emoji(text)
+
             if text.strip():
                 messages_data.append({
                     'text': text.strip(),
                     'date': msg_date.strftime("%d.%m.%Y %H:%M:%S")
                 })
                 count += 1
-                if count % 50 == 0: 
+                if count % 50 == 0:
                     logger.info(f"Parsed {count} messages...")
 
     return messages_data
@@ -113,13 +135,15 @@ async def main():
     parser = argparse.ArgumentParser(description="Telegram Channel Parser CLI")
     
     # Позиционный аргумент в конце будет работать лучше, если сначала идут флаги
-    parser.add_argument("channel", nargs='?', help="Channel URL or @username")
+    parser.add_argument("channel", nargs='?', help="Channel URL (https://t.me/***)")
     parser.add_argument("-s", "--start", help="Start date DD.MM.YYYY", default="01.01.1970")
     parser.add_argument("-e", "--end", help="End date DD.MM.YYYY", default=None)
     parser.add_argument("-o", "--output", help="Output filename (in Downloads)", default="result")
     parser.add_argument("-f", "--format", choices=['txt', 'json'], default='txt', help="Output format")
     parser.add_argument("-l", "--limit", type=int, help="Max messages to parse")
+    parser.add_argument("-r", "--reverse", action="store_true", help="Write output from oldest to newest (default: newest to oldest)")
     parser.add_argument("--no-links", action="store_true", help="Remove links from text (default: keep links)")
+    parser.add_argument("--no-emoji", action="store_true", help="Remove all emoji from text (default: keep emoji)")
     parser.add_argument("--auth", action="store_true", help="Run authorization mode")
 
     args = parser.parse_args()
@@ -157,8 +181,11 @@ async def main():
             return
 
         # Парсим
-        results = await parse_channel(app, channel_id, start_dt, end_dt, args.limit, args.no_links)
-        
+        results = await parse_channel(app, channel_id, start_dt, end_dt, args.limit, args.no_links, args.no_emoji)
+
+        if args.reverse:
+            results = list(reversed(results))
+
         if results:
             save_results(results, args.output, args.format)
         else:
