@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 import os
-import sys
 import re
 import asyncio
 import logging
@@ -8,14 +7,12 @@ import json
 import argparse
 from datetime import datetime, timedelta
 
-# --- Совместимость с Python 3.10+ ---
 try:
     asyncio.get_event_loop()
 except RuntimeError:
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
 
-# Загрузить переменные из .env файла
 try:
     from dotenv import load_dotenv
     load_dotenv()
@@ -45,15 +42,6 @@ def normalize_whitespace(text: str) -> str:
     lines = [line.strip() for line in text.split('\n')]
     text = '\n'.join(lines)
     return re.sub(r'\n{3,}', '\n\n', text).strip()
-
-
-def remove_links(text: str) -> str:
-    """Удаляет ссылки из текста (URL и t.me)."""
-    if not text:
-        return ""
-    text = re.sub(r'https?://[^\s\n\)]+', '', text)
-    text = re.sub(r'[^\s\n]*t\.me/[^\s\n\)]+', '', text)
-    return text
 
 
 def remove_emoji(text: str) -> str:
@@ -156,30 +144,14 @@ async def parse_channel(
     start_date: datetime,
     end_date: datetime,
     limit: int,
-    no_links: bool,
     no_emoji: bool,
-    post_id: int | None = None,
 ):
     messages_data = []
     count = 0
 
-    logger.info(f"Parsing channel {channel_id} (Limit: {limit or 'None'}, No-Links: {no_links}, No-Emoji: {no_emoji})")
+    logger.info(f"Parsing channel {channel_id} (Limit: {limit or 'None'}, No-Emoji: {no_emoji})")
 
-    if post_id:
-        target_message = await app.get_messages(channel_id, post_id)
-        message_iterable = [target_message] if target_message else []
-    else:
-        message_iterable = app.get_chat_history(channel_id)
-
-    async def _iterate_messages():
-        if post_id:
-            for msg in message_iterable:
-                yield msg
-        else:
-            async for msg in message_iterable:
-                yield msg
-
-    async for message in _iterate_messages():
+    async for message in app.get_chat_history(channel_id):
         if not message:
             continue
         if limit and count >= limit:
@@ -195,16 +167,13 @@ async def parse_channel(
         views = get_message_views(message)
         reactions_count = get_message_reactions_count(message)
 
-        if no_links:
-            text = remove_links(text)
         text = normalize_whitespace(text)
         if no_emoji:
             text = remove_emoji(text)
 
-        if text.strip():
+        if text:
             messages_data.append({
-                'post_id': getattr(message, "id", 0),
-                'text': text.strip(),
+                'text': text,
                 'date': msg_date.strftime("%d.%m.%Y %H:%M:%S"),
                 'views': views,
                 'reactions_count': reactions_count
@@ -240,24 +209,27 @@ def save_results(messages: list, filename: str, fmt: str):
 
 # ---------------- Execution ----------------
 async def main():
-    parser = argparse.ArgumentParser(description="Telegram Channel Parser CLI")
+    parser = argparse.ArgumentParser(
+        description="Telegram Channel Parser CLI",
+        usage="userbot.py [-h] [-a] [-s START] [-e END] [-o OUTPUT] [-f {txt,json}] [-l LIMIT] [-r] [-j] [channel]",
+        add_help=False,
+    )
     
+    parser.add_argument("-h", "--help", action="help", help="Show this help message and exit")
     parser.add_argument("channel", nargs='?', help="Channel URL (https://t.me/***)")
-    parser.add_argument("-s", "--start", help="Start date DD.MM.YYYY", default="01.01.1970")
-    parser.add_argument("-e", "--end", help="End date DD.MM.YYYY", default=None)
-    parser.add_argument("-o", "--output", help="Output filename (in Downloads)", default="result")
-    parser.add_argument("-f", "--format", choices=['txt', 'json'], default='txt', help="Output format")
-    parser.add_argument("-l", "--limit", type=int, help="Max messages to parse")
-    parser.add_argument("--post-id", type=int, help="Parse only one post by Telegram message id")
+    parser.add_argument("-a", "--auth", action="store_true", help="Run authorization mode")
+    parser.add_argument("-s", metavar="START", help="Start date in DD.MM.YYYY format", default="01.01.1970")
+    parser.add_argument("-e", metavar="END", help="End date in DD.MM.YYYY format", default=None)
+    parser.add_argument("-o", metavar="OUTPUT", help="Output file name (saved to Downloads by default)", default="result")
+    parser.add_argument("-f", choices=['txt', 'json'], default='txt', help="Output format: txt or json")
+    parser.add_argument("-l", metavar="LIMIT", type=int, help="Maximum number of messages to parse")
     parser.add_argument("-r", "--reverse", action="store_true", help="Write output from oldest to newest (default: newest to oldest)")
-    parser.add_argument("--no-links", action="store_true", help="Remove links from text (default: keep links)")
-    parser.add_argument("--no-emoji", action="store_true", help="Remove all emoji from text (default: keep emoji)")
-    parser.add_argument("--auth", action="store_true", help="Run authorization mode")
+    parser.add_argument("-j", "--no-emoji", action="store_true", help="Remove all emoji from text (default: keep emoji)")
 
     args = parser.parse_args()
 
     if args.auth:
-        async with Client(SESSION_PATH, api_id=API_ID, api_hash=API_HASH, phone_number=PHONE) as auth_app:
+        async with Client(SESSION_PATH, api_id=API_ID, api_hash=API_HASH, phone_number=PHONE):
             print("\n--- Authorization Successful! ---\n")
         return
 
@@ -266,9 +238,9 @@ async def main():
         return
 
     try:
-        start_dt = datetime.strptime(args.start, "%d.%m.%Y")
-        end_dt = datetime.strptime(args.end, "%d.%m.%Y") if args.end else datetime.now()
-        if args.end:
+        start_dt = datetime.strptime(args.s, "%d.%m.%Y")
+        end_dt = datetime.strptime(args.e, "%d.%m.%Y") if args.e else datetime.now()
+        if args.e:
             end_dt = end_dt + timedelta(days=1) - timedelta(microseconds=1)
     except ValueError as e:
         logger.error(f"Date format error: {e}. Use DD.MM.YYYY")
@@ -292,17 +264,15 @@ async def main():
             channel_id,
             start_dt,
             end_dt,
-            args.limit,
-            args.no_links,
+            args.l,
             args.no_emoji,
-            args.post_id,
         )
 
         if args.reverse:
             results = list(reversed(results))
 
         if results:
-            save_results(results, args.output, args.format)
+            save_results(results, args.o, args.f)
         else:
             logger.warning("No messages found for the given criteria.")
 
