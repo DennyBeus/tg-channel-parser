@@ -74,6 +74,52 @@ def remove_emoji(text: str) -> str:
     )
     return emoji_pattern.sub("", text)
 
+
+def get_message_text_plain(message) -> str:
+    """Возвращает текст/подпись сообщения без markdown-конвертации."""
+    try:
+        return str(message.text or message.caption or "")
+    except Exception:
+        return ""
+
+
+def get_message_views(message) -> int:
+    """Возвращает количество просмотров поста."""
+    try:
+        views = getattr(message, "views", None)
+        return int(views) if views is not None else 0
+    except (TypeError, ValueError):
+        return 0
+
+
+def get_message_reactions_count(message) -> int:
+    """Возвращает суммарное количество реакций по посту."""
+    reactions = getattr(message, "reactions", None)
+    if not reactions:
+        return 0
+
+    # Основной формат Pyrogram: message.reactions.reactions -> список реакций с полем count.
+    reaction_items = getattr(reactions, "reactions", None)
+    if reaction_items is None and isinstance(reactions, list):
+        reaction_items = reactions
+
+    if reaction_items:
+        total = 0
+        for item in reaction_items:
+            count = getattr(item, "count", 0)
+            try:
+                total += int(count or 0)
+            except (TypeError, ValueError):
+                continue
+        return total
+
+    # Запасной вариант, если библиотека вернула агрегированное значение.
+    total_count = getattr(reactions, "count", None)
+    try:
+        return int(total_count) if total_count is not None else 0
+    except (TypeError, ValueError):
+        return 0
+
 # ---------------- Core Parsing Logic ----------------
 async def parse_channel(app: Client, channel_id: int, start_date: datetime, end_date: datetime, limit: int, no_links: bool, no_emoji: bool):
     messages_data = []
@@ -91,7 +137,10 @@ async def parse_channel(app: Client, channel_id: int, start_date: datetime, end_
         if msg_date > end_date:
             continue
 
-        text = message.text or message.caption or ""
+        # Берем чистый текст/подпись, независимо от форматирования Telegram.
+        text = get_message_text_plain(message)
+        views = get_message_views(message)
+        reactions_count = get_message_reactions_count(message)
 
         if text:
             if no_links:
@@ -103,7 +152,9 @@ async def parse_channel(app: Client, channel_id: int, start_date: datetime, end_
             if text.strip():
                 messages_data.append({
                     'text': text.strip(),
-                    'date': msg_date.strftime("%d.%m.%Y %H:%M:%S")
+                    'date': msg_date.strftime("%d.%m.%Y %H:%M:%S"),
+                    'views': views,
+                    'reactions_count': reactions_count
                 })
                 count += 1
                 if count % 50 == 0:
@@ -126,7 +177,11 @@ def save_results(messages: list, filename: str, fmt: str):
     else:
         with open(full_path, 'w', encoding='utf-8') as f:
             for m in messages:
-                f.write(f"[{m['date']}]\n{m['text']}\n\n---\n\n")
+                f.write(
+                    f"[{m['date']}] "
+                    f"(views: {m.get('views', 0)}, reactions: {m.get('reactions_count', 0)})\n"
+                    f"{m['text']}\n\n---\n\n"
+                )
     
     logger.info(f"Successfully saved {len(messages)} items to {full_path}")
 
