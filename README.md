@@ -1,5 +1,7 @@
 # Telegram Channel Parser
 
+[English](README.md) | [Русский](README.ru.md)
+
 A simple Python CLI script for exporting posts from Telegram channels with date filtering and export to `txt` or `json`.
 
 Special thanks to the author of [`kurigram`](https://github.com/KurimuzonAkuma/kurigram/tree/dev) for helping resolve the issue with parsing posts that use the Quote font style.
