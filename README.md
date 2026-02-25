@@ -40,7 +40,7 @@ This client is used for:
 - Python 3.8+ (a modern version is recommended);
 - Telegram API credentials: `API_ID`, `API_HASH`, `PHONE_NUMBER`.
 
-You can get `API_ID` and `API_HASH` at `my.telegram.org`.
+You can get `API_ID` and `API_HASH` at [`my.telegram.org`](https://my.telegram.org/auth).
 
 ## Installation
 
@@ -88,8 +88,6 @@ python userbot.py --auth
 ```bash
 python userbot.py https://t.me/channel_name
 ```
-
-You can pass a link or `@username`.
 
 ### 3) With option examples
 
@@ -143,8 +141,7 @@ python userbot.py -s 01.01.2024 -e 31.12.2024 -l 500 -f json -o export_2024 -j -
 
 ## Where the result is saved
 
-- If only a file name is specified (for example, `-o report`), the file is saved to the user's `Downloads` folder:
-  - `report.txt` or `report.json`.
+- If only a file name is specified (for example, `-o report`), the file is saved to the user's `Downloads` folder: `report.txt` or `report.json`.
 - If a path is specified, saving is done to that path.
 
 ## Data format
@@ -161,3 +158,7 @@ Each message contains:
 - The script reads history from newest to oldest, and with `-r` reverses the result before saving.
 - Messages without text are skipped.
 - If nothing is found by the specified criteria, the script shows a warning and does not create a file.
+
+## Need to update
+
+- I want to add links parsing function with entities. Now it works only with text without markdown.
