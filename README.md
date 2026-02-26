@@ -4,6 +4,8 @@
 
 A simple Python CLI script for exporting posts from Telegram channels with date filtering and export to `txt` or `json`.
 
+Thanks to the CLI interface and `--stdout` JSON output, the script integrates easily into automation platforms like n8n — just call it from an Execute Command node and pass the result downstream.
+
 Special thanks to the author of [`kurigram`](https://github.com/KurimuzonAkuma/kurigram/tree/dev) for helping resolve the issue with parsing posts that use the Quote font style.
 
 ## What the program does
@@ -11,8 +13,11 @@ Special thanks to the author of [`kurigram`](https://github.com/KurimuzonAkuma/k
 - connects to Telegram as a user (userbot session);
 - reads channel history;
 - extracts post text and media captions;
-- saves date, text, views, and total reaction count;
-- can limit the number of messages and remove emoji from text.
+- extracts inline URLs from text_link entities and inserts them after the anchor text (with correct handling of emoji/UTF-16 offsets);
+- saves date, text, views, total reaction count, post link, and source channel;
+- supports parsing multiple channels in a single run;
+- can limit the number of messages and remove emoji from text;
+- can output results as JSON to stdout for piping into other tools.
 
 ## Libraries and why `kurigram` is important here
 
@@ -72,10 +77,11 @@ If `DATA_DIR` is not specified, `./data` is used by default.
 
 1. You run authorization once (`--auth`) to create a session.
 2. The script saves the session in the data folder (`DATA_DIR/user`).
-3. On a normal run, it resolves the channel, reads history, and filters messages by date.
+3. On a normal run, it resolves the channel(s), reads history, and filters messages by date.
 4. The text is normalized (extra spaces and empty lines are removed).
-5. With the `-j` flag, emoji are removed.
-6. The result is saved to a file.
+5. Inline URLs from text_link entities are extracted and inserted after the anchor text.
+6. With the `-j` flag, emoji are removed.
+7. The result is saved to a file or printed to stdout (`--stdout`).
 
 ## Usage
 
@@ -123,6 +129,18 @@ Order from oldest to newest:
 python userbot.py -r https://t.me/channel_name
 ```
 
+Print JSON to stdout (for piping or quick preview):
+
+```bash
+python userbot.py --stdout -f json -l 10 https://t.me/channel_name
+```
+
+Multiple channels in one run:
+
+```bash
+python userbot.py -f json -o combined https://t.me/channel1 https://t.me/channel2
+```
+
 Combined example:
 
 ```bash
@@ -131,15 +149,16 @@ python userbot.py -s 01.01.2024 -e 31.12.2024 -l 500 -f json -o export_2024 -j -
 
 ## CLI arguments
 
-- `channel` — channel (required, except in `--auth` mode);
+- `channel` — one or more channel URLs (required, except in `--auth` mode);
 - `-a, --auth` — authorization mode;
 - `-s START` — start date in `DD.MM.YYYY` format (default: `01.01.1970`);
 - `-e END` — end date in `DD.MM.YYYY` format (default: current date);
 - `-o OUTPUT` — output file name (default: `result`);
 - `-f {txt,json}` — file format (default: `txt`);
-- `-l LIMIT` — maximum number of messages;
+- `-l LIMIT` — maximum number of messages per channel;
 - `-r, --reverse` — write output from oldest to newest;
-- `-j, --no-emoji` — remove emoji from text.
+- `-j, --no-emoji` — remove emoji from text;
+- `--stdout` — print JSON to stdout instead of saving to file.
 
 ## Where the result is saved
 
@@ -150,10 +169,12 @@ python userbot.py -s 01.01.2024 -e 31.12.2024 -l 500 -f json -o export_2024 -j -
 
 Each message contains:
 
-- `text` — post text or media caption;
-- `date` — date/time in `DD.MM.YYYY HH:MM:SS` format;
+- `text` — post text or media caption (inline URLs from text_link entities are appended in parentheses after the anchor text);
+- `date` — date/time in `YYYY-MM-DD HH:MM:SS` format;
 - `views` — views;
-- `reactions_count` — total number of reactions.
+- `reactions_count` — total number of reactions;
+- `link` — direct link to the post (`https://t.me/channel/id`);
+- `source_channel` — channel username.
 
 ## Useful to know
 
@@ -161,6 +182,9 @@ Each message contains:
 - Messages without text are skipped.
 - If nothing is found by the specified criteria, the script shows a warning and does not create a file.
 
-## Need to update
+## Recent changes
 
-- I want to add links parsing function with entities. Now it works only with text without markdown.
+- Added inline URL extraction from `text_link` entities with correct UTF-16 offset handling for emoji.
+- Added `--stdout` flag to print JSON directly to the terminal.
+- Added `link` and `source_channel` fields to the output.
+- Support for parsing multiple channels in a single run.
