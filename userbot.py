@@ -102,6 +102,57 @@ def get_message_text_plain(message) -> str:
     return _extract_text_from_raw_message(message)
 
 
+def _utf16_to_python_index(text: str, utf16_offset: int) -> int:
+    """Telegram entity offsets are in UTF-16 code units; Python strings use code points."""
+    pos = 0
+    for i, ch in enumerate(text):
+        if pos >= utf16_offset:
+            return i
+        pos += 2 if ord(ch) > 0xFFFF else 1
+    return len(text)
+
+
+def get_message_text_with_urls(message) -> str:
+    """Возвращает текст сообщения с inline URL, вставленными после якорного текста."""
+    text = _safe_attr_text(message, "text")
+    entities = getattr(message, "entities", None)
+
+    if not text:
+        text = _safe_attr_text(message, "caption")
+        entities = getattr(message, "caption_entities", None)
+
+    if not text:
+        return _extract_text_from_raw_message(message)
+
+    if not entities:
+        return text
+
+    inserts = []
+    for entity in entities:
+        entity_type = getattr(entity, "type", None)
+        if entity_type is None:
+            continue
+        type_str = str(entity_type).lower()
+        if "text_link" in type_str:
+            url = getattr(entity, "url", "")
+            if url:
+                raw_offset = getattr(entity, "offset", 0)
+                raw_length = getattr(entity, "length", 0)
+                py_end = _utf16_to_python_index(text, raw_offset + raw_length)
+                while py_end < len(text) and not text[py_end].isspace() and text[py_end] not in '.,;:!?)]}':
+                    py_end += 1
+                inserts.append((py_end, url))
+
+    if not inserts:
+        return text
+
+    inserts.sort(key=lambda x: x[0], reverse=True)
+    for pos, url in inserts:
+        text = text[:pos] + f" ({url})" + text[pos:]
+
+    return text
+
+
 def get_message_views(message) -> int:
     """Возвращает количество просмотров поста."""
     try:
@@ -141,6 +192,7 @@ def get_message_reactions_count(message) -> int:
 async def parse_channel(
     app: Client,
     channel_id: int,
+    channel_username: str,
     start_date: datetime,
     end_date: datetime,
     limit: int,
@@ -149,7 +201,7 @@ async def parse_channel(
     messages_data = []
     count = 0
 
-    logger.info(f"Parsing channel {channel_id} (Limit: {limit or 'None'}, No-Emoji: {no_emoji})")
+    logger.info(f"Parsing channel {channel_username} (Limit: {limit or 'None'}, No-Emoji: {no_emoji})")
 
     async for message in app.get_chat_history(channel_id):
         if not message:
@@ -163,7 +215,7 @@ async def parse_channel(
         if msg_date > end_date:
             continue
 
-        text = get_message_text_plain(message)
+        text = get_message_text_with_urls(message)
         views = get_message_views(message)
         reactions_count = get_message_reactions_count(message)
 
@@ -174,9 +226,11 @@ async def parse_channel(
         if text:
             messages_data.append({
                 'text': text,
-                'date': msg_date.strftime("%d.%m.%Y %H:%M:%S"),
+                'date': msg_date.strftime("%Y-%m-%d %H:%M:%S"),
                 'views': views,
-                'reactions_count': reactions_count
+                'reactions_count': reactions_count,
+                'link': f"https://t.me/{channel_username}/{message.id}",
+                'source_channel': channel_username,
             })
             count += 1
             if count % 50 == 0:
@@ -211,12 +265,12 @@ def save_results(messages: list, filename: str, fmt: str):
 async def main():
     parser = argparse.ArgumentParser(
         description="Telegram Channel Parser CLI",
-        usage="userbot.py [-h] [-a] [-s START] [-e END] [-o OUTPUT] [-f {txt,json}] [-l LIMIT] [-r] [-j] [channel]",
+        usage="userbot.py [-h] [-a] [-s START] [-e END] [-o OUTPUT] [-f {txt,json}] [-l LIMIT] [-r] [-j] [--stdout] [channel ...]",
         add_help=False,
     )
     
     parser.add_argument("-h", "--help", action="help", help="Show this help message and exit")
-    parser.add_argument("channel", nargs='?', help="Channel URL (https://t.me/***)")
+    parser.add_argument("channel", nargs='*', help="Channel URLs (https://t.me/***)")
     parser.add_argument("-a", "--auth", action="store_true", help="Run authorization mode")
     parser.add_argument("-s", metavar="START", help="Start date in DD.MM.YYYY format", default="01.01.1970")
     parser.add_argument("-e", metavar="END", help="End date in DD.MM.YYYY format", default=None)
@@ -225,6 +279,7 @@ async def main():
     parser.add_argument("-l", metavar="LIMIT", type=int, help="Maximum number of messages to parse")
     parser.add_argument("-r", "--reverse", action="store_true", help="Write output from oldest to newest (default: newest to oldest)")
     parser.add_argument("-j", "--no-emoji", action="store_true", help="Remove all emoji from text (default: keep emoji)")
+    parser.add_argument("--stdout", action="store_true", help="Print JSON to stdout instead of saving to file")
 
     args = parser.parse_args()
 
@@ -249,32 +304,40 @@ async def main():
     os.makedirs(DATA_DIR, exist_ok=True)
     
     app = Client(SESSION_PATH, api_id=API_ID, api_hash=API_HASH, phone_number=PHONE)
+    all_results = []
     
     async with app:
-        clean_channel = args.channel.replace("https://t.me/", "").replace("http://t.me/", "").replace("@", "").strip()
-        try:
-            chat = await app.get_chat(clean_channel)
-            channel_id = chat.id
-        except Exception as e:
-            logger.error(f"Could not find channel '{args.channel}': {e}")
-            return
+        for channel_arg in args.channel:
+            clean_channel = channel_arg.replace("https://t.me/", "").replace("http://t.me/", "").replace("@", "").strip()
+            try:
+                chat = await app.get_chat(clean_channel)
+                channel_id = chat.id
+            except Exception as e:
+                logger.error(f"Could not find channel '{channel_arg}': {e}")
+                continue
 
-        results = await parse_channel(
-            app,
-            channel_id,
-            start_dt,
-            end_dt,
-            args.l,
-            args.no_emoji,
-        )
+            results = await parse_channel(
+                app,
+                channel_id,
+                clean_channel,
+                start_dt,
+                end_dt,
+                args.l,
+                args.no_emoji,
+            )
+            all_results.extend(results)
 
-        if args.reverse:
-            results = list(reversed(results))
+    if args.reverse:
+        all_results = list(reversed(all_results))
 
-        if results:
-            save_results(results, args.o, args.f)
-        else:
-            logger.warning("No messages found for the given criteria.")
+    if not all_results:
+        logger.warning("No messages found for the given criteria.")
+        return
+
+    if args.stdout:
+        print(json.dumps(all_results, ensure_ascii=False, indent=2))
+    else:
+        save_results(all_results, args.o, args.f)
 
 if __name__ == "__main__":
     try:
