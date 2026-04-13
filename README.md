@@ -162,6 +162,12 @@ Combined example:
 python userbot.py -s 01.01.2024 -e 31.12.2024 -l 500 -f json -o export_2024 -j -r https://t.me/channel_name
 ```
 
+Keywords example:
+
+```bash
+python userbot.py https://t.me/channel_name -e 01.02.2026 -o grace_info -f json -j -k GRACE
+```
+
 ## CLI arguments
 
 - `channel` — one or more channel URLs (required, except in `--auth` mode);

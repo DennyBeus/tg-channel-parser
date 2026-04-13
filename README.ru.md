@@ -162,6 +162,12 @@ python userbot.py -f json -o combined https://t.me/channel1 https://t.me/channel
 python userbot.py -s 01.01.2024 -e 31.12.2024 -l 500 -f json -o export_2024 -j -r https://t.me/channel_name
 ```
 
+Парсинг по ключевому слову:
+
+```bash
+python userbot.py https://t.me/channel_name -e 01.02.2026 -o grace_info -f json -j -k GRACE
+```
+
 ## Аргументы CLI
 
 - `channel` — один или несколько URL каналов (обязателен, кроме режима `--auth`);
