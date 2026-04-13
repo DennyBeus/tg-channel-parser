@@ -40,6 +40,9 @@ if os.getenv("PROXY_HOSTNAME"):
         "hostname": os.getenv("PROXY_HOSTNAME"),
         "port": int(os.getenv("PROXY_PORT", "8080")),
     }
+    if os.getenv("PROXY_USERNAME"):
+        PROXY["username"] = os.getenv("PROXY_USERNAME")
+        PROXY["password"] = os.getenv("PROXY_PASSWORD", "")
 
 # ---------------- Text processing ----------------
 def normalize_whitespace(text: str) -> str:
@@ -283,7 +286,7 @@ def save_results(messages: list, filename: str, fmt: str):
 async def main():
     parser = argparse.ArgumentParser(
         description="Telegram Channel Parser CLI",
-        usage="userbot.py [-h] [-a] [-s START] [-e END] [-o OUTPUT] [-f {txt,json}] [-l LIMIT] [-r] [-j] [--stdout] [channel ...]",
+        usage="userbot.py [-h] [-a] [-s START] [-e END] [-o OUTPUT] [-f {txt,json}] [-l LIMIT] [-r] [-j] [-k WORD [WORD ...]] [--stdout] [channel ...]",
         add_help=False,
     )
     
