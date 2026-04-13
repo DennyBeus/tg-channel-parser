@@ -73,6 +73,21 @@ DATA_DIR=./data
 
 If `DATA_DIR` is not specified, `./data` is used by default.
 
+### Proxy setup (optional)
+
+If Telegram is blocked in your region or you use a paid proxy, add the following to `.env`:
+
+```env
+PROXY_SCHEME=http
+PROXY_HOSTNAME=127.0.0.1
+PROXY_PORT=8080
+# For paid proxies with authentication:
+PROXY_USERNAME=your_login
+PROXY_PASSWORD=your_password
+```
+
+Supported schemes: `http`, `socks5`. `PROXY_USERNAME` and `PROXY_PASSWORD` are optional — omit them if the proxy requires no authentication.
+
 ## How it works step by step
 
 1. You run authorization once (`--auth`) to create a session.
@@ -158,6 +173,7 @@ python userbot.py -s 01.01.2024 -e 31.12.2024 -l 500 -f json -o export_2024 -j -
 - `-l LIMIT` — maximum number of messages per channel;
 - `-r, --reverse` — write output from oldest to newest;
 - `-j, --no-emoji` — remove emoji from text;
+- `-k WORD [WORD ...]` — filter posts by keywords (case-insensitive); only posts containing at least one word are kept;
 - `--stdout` — print JSON to stdout instead of saving to file.
 
 ## Where the result is saved
@@ -188,3 +204,5 @@ Each message contains:
 - Added `--stdout` flag to print JSON directly to the terminal.
 - Added `link` and `source_channel` fields to the output.
 - Support for parsing multiple channels in a single run.
+- Added `-k / --keywords` flag: filter posts by one or more keywords (case-insensitive). Only posts containing at least one of the specified words are included in the output.
+- Added proxy support via `.env` (`PROXY_SCHEME`, `PROXY_HOSTNAME`, `PROXY_PORT`, `PROXY_USERNAME`, `PROXY_PASSWORD`). Useful when Telegram is blocked or when using paid proxies with authentication.
