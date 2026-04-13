@@ -33,6 +33,14 @@ DATA_DIR = os.getenv("DATA_DIR", "./data")
 SESSION_PATH = os.path.join(DATA_DIR, "user")
 DOWNLOADS_DIR = os.path.join(os.path.expanduser("~"), "Downloads")
 
+PROXY = None
+if os.getenv("PROXY_HOSTNAME"):
+    PROXY = {
+        "scheme": os.getenv("PROXY_SCHEME", "http"),
+        "hostname": os.getenv("PROXY_HOSTNAME"),
+        "port": int(os.getenv("PROXY_PORT", "8080")),
+    }
+
 # ---------------- Text processing ----------------
 def normalize_whitespace(text: str) -> str:
     """Очистка лишних пробелов и пустых строк (всегда при парсинге)."""
@@ -162,6 +170,16 @@ def get_message_views(message) -> int:
         return 0
 
 
+def filter_by_keywords(messages: list, keywords: list) -> list:
+    """Фильтрует сообщения, оставляя только те, где есть хотя бы одно ключевое слово."""
+    if not keywords:
+        return messages
+    lower_keywords = [kw.lower() for kw in keywords]
+    filtered = [m for m in messages if any(kw in m['text'].lower() for kw in lower_keywords)]
+    logger.info(f"Keyword filter {keywords}: {len(messages)} → {len(filtered)} messages")
+    return filtered
+
+
 def get_message_reactions_count(message) -> int:
     """Возвращает суммарное количество реакций по посту."""
     reactions = getattr(message, "reactions", None)
@@ -279,12 +297,13 @@ async def main():
     parser.add_argument("-l", metavar="LIMIT", type=int, help="Maximum number of messages to parse")
     parser.add_argument("-r", "--reverse", action="store_true", help="Write output from oldest to newest (default: newest to oldest)")
     parser.add_argument("-j", "--no-emoji", action="store_true", help="Remove all emoji from text (default: keep emoji)")
+    parser.add_argument("-k", "--keywords", nargs='+', metavar="WORD", help="Filter posts: keep only those containing at least one keyword (case-insensitive)")
     parser.add_argument("--stdout", action="store_true", help="Print JSON to stdout instead of saving to file")
 
     args = parser.parse_args()
 
     if args.auth:
-        async with Client(SESSION_PATH, api_id=API_ID, api_hash=API_HASH, phone_number=PHONE):
+        async with Client(SESSION_PATH, api_id=API_ID, api_hash=API_HASH, phone_number=PHONE, proxy=PROXY):
             print("\n--- Authorization Successful! ---\n")
         return
 
@@ -303,7 +322,7 @@ async def main():
 
     os.makedirs(DATA_DIR, exist_ok=True)
     
-    app = Client(SESSION_PATH, api_id=API_ID, api_hash=API_HASH, phone_number=PHONE)
+    app = Client(SESSION_PATH, api_id=API_ID, api_hash=API_HASH, phone_number=PHONE, proxy=PROXY)
     all_results = []
     
     async with app:
@@ -326,6 +345,9 @@ async def main():
                 args.no_emoji,
             )
             all_results.extend(results)
+
+    if args.keywords:
+        all_results = filter_by_keywords(all_results, args.keywords)
 
     if args.reverse:
         all_results = list(reversed(all_results))
