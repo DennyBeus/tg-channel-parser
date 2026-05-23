@@ -13,6 +13,7 @@ from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.fsm.storage.memory import MemoryStorage
 from aiogram.types import (
+    BotCommand,
     CallbackQuery,
     FSInputFile,
     InlineKeyboardButton,
@@ -53,6 +54,9 @@ class ParseStates(StatesGroup):
     channel = State()
     dates = State()
     fmt = State()
+    limit = State()
+    no_emoji = State()
+    reverse = State()
     keywords = State()
 
 
@@ -223,6 +227,66 @@ async def state_dates(message: Message, state: FSMContext):
 async def cb_fmt(callback: CallbackQuery, state: FSMContext):
     fmt = callback.data.split("_")[1]
     await state.update_data(fmt=fmt)
+    await state.set_state(ParseStates.limit)
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="Пропустить", callback_data="skip_limit")],
+    ])
+    await callback.message.answer(
+        "Лимит сообщений на канал? Введи число.\nИли нажми «Пропустить».",
+        reply_markup=keyboard,
+    )
+    await callback.answer()
+
+
+@router.callback_query(OwnerFilter(), F.data == "skip_limit", ParseStates.limit)
+async def cb_skip_limit(callback: CallbackQuery, state: FSMContext):
+    await state.update_data(limit=None)
+    await _ask_no_emoji(callback.message, state)
+    await callback.answer()
+
+
+@router.message(OwnerFilter(), ParseStates.limit)
+async def state_limit(message: Message, state: FSMContext):
+    text = message.text.strip()
+    if not text.isdigit():
+        await message.answer("Введи целое число или нажми «Пропустить».")
+        return
+    await state.update_data(limit=text)
+    await _ask_no_emoji(message, state)
+
+
+async def _ask_no_emoji(message: Message, state: FSMContext):
+    await state.set_state(ParseStates.no_emoji)
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[
+        [
+            InlineKeyboardButton(text="Удалить", callback_data="emoji_remove"),
+            InlineKeyboardButton(text="Оставить", callback_data="emoji_keep"),
+        ],
+    ])
+    await message.answer("Emoji в тексте?", reply_markup=keyboard)
+
+
+@router.callback_query(OwnerFilter(), F.data.in_({"emoji_remove", "emoji_keep"}), ParseStates.no_emoji)
+async def cb_no_emoji(callback: CallbackQuery, state: FSMContext):
+    await state.update_data(no_emoji=(callback.data == "emoji_remove"))
+    await _ask_reverse(callback.message, state)
+    await callback.answer()
+
+
+async def _ask_reverse(message: Message, state: FSMContext):
+    await state.set_state(ParseStates.reverse)
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[
+        [
+            InlineKeyboardButton(text="От старых к новым", callback_data="order_old"),
+            InlineKeyboardButton(text="От новых к старым", callback_data="order_new"),
+        ],
+    ])
+    await message.answer("Порядок сообщений?", reply_markup=keyboard)
+
+
+@router.callback_query(OwnerFilter(), F.data.in_({"order_old", "order_new"}), ParseStates.reverse)
+async def cb_reverse(callback: CallbackQuery, state: FSMContext):
+    await state.update_data(reverse=(callback.data == "order_old"))
     await state.set_state(ParseStates.keywords)
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="Пропустить", callback_data="skip_keywords")],
@@ -257,6 +321,12 @@ async def _run_from_state(message: Message, state: FSMContext):
         args += ["-e", data["end"]]
     if data.get("fmt"):
         args += ["-f", data["fmt"]]
+    if data.get("limit"):
+        args += ["-l", data["limit"]]
+    if data.get("no_emoji"):
+        args += ["-j"]
+    if data.get("reverse"):
+        args += ["-r"]
     if data.get("keywords"):
         args += ["-k"] + data["keywords"].split()
     await run_parse_job(message.bot, message.chat.id, args)
@@ -366,6 +436,13 @@ async def main():
     bot = Bot(token=BOT_TOKEN)
     dp = Dispatcher(storage=MemoryStorage())
     dp.include_router(router)
+
+    await bot.set_my_commands([
+        BotCommand(command="start", description="Главное меню"),
+        BotCommand(command="parse", description="Запустить парсинг канала"),
+        BotCommand(command="auth", description="Обновить сессию"),
+        BotCommand(command="cancel", description="Отменить текущее действие"),
+    ])
 
     logger.info(f"Bot started. Owner ID: {OWNER_ID}")
     await dp.start_polling(bot, allowed_updates=["message", "callback_query"])
