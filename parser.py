@@ -218,11 +218,13 @@ async def parse_channel(
     end_date: datetime,
     limit: int,
     no_emoji: bool,
+    keywords: list | None = None,
 ):
     messages_data = []
     count = 0
+    lower_keywords = [kw.lower() for kw in keywords] if keywords else None
 
-    logger.info(f"Parsing channel {channel_username} (Limit: {limit or 'None'}, No-Emoji: {no_emoji})")
+    logger.info(f"Parsing channel {channel_username} (Limit: {limit or 'None'}, No-Emoji: {no_emoji}, Keywords: {keywords or 'None'})")
 
     async for message in app.get_chat_history(channel_id):
         if not message:
@@ -244,18 +246,23 @@ async def parse_channel(
         if no_emoji:
             text = remove_emoji(text)
 
-        if text:
-            messages_data.append({
-                'text': text,
-                'date': msg_date.strftime("%Y-%m-%d %H:%M:%S"),
-                'views': views,
-                'reactions_count': reactions_count,
-                'link': f"https://t.me/{channel_username}/{message.id}",
-                'source_channel': channel_username,
-            })
-            count += 1
-            if count % 50 == 0:
-                logger.info(f"Parsed {count} messages...")
+        if not text:
+            continue
+
+        if lower_keywords and not any(kw in text.lower() for kw in lower_keywords):
+            continue
+
+        messages_data.append({
+            'text': text,
+            'date': msg_date.strftime("%Y-%m-%d %H:%M:%S"),
+            'views': views,
+            'reactions_count': reactions_count,
+            'link': f"https://t.me/{channel_username}/{message.id}",
+            'source_channel': channel_username,
+        })
+        count += 1
+        if count % 50 == 0:
+            logger.info(f"Parsed {count} messages...")
 
     return messages_data
 
@@ -346,11 +353,9 @@ async def main():
                 end_dt,
                 args.l,
                 args.no_emoji,
+                args.keywords,
             )
             all_results.extend(results)
-
-    if args.keywords:
-        all_results = filter_by_keywords(all_results, args.keywords)
 
     if args.reverse:
         all_results = list(reversed(all_results))
