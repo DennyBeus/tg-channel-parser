@@ -25,3 +25,5 @@ data/
 # Docker
 *.env
 docker-compose.override.yml
+
+tmp/

@@ -103,13 +103,13 @@ PROXY_PASSWORD=your_password
 ### 1) Авторизация (первый запуск)
 
 ```bash
-python userbot.py --auth
+python parser.py --auth
 ```
 
 ### 2) Базовый парсинг всего канала
 
 ```bash
-python userbot.py https://t.me/channel_name
+python parser.py https://t.me/channel_name
 ```
 
 ### 3) Кастомный парсинг
@@ -117,55 +117,55 @@ python userbot.py https://t.me/channel_name
 По диапазону дат:
 
 ```bash
-python userbot.py -s 01.01.2024 -e 31.01.2024 https://t.me/channel_name
+python parser.py -s 01.01.2024 -e 31.01.2024 https://t.me/channel_name
 ```
 
 Лимит сообщений:
 
 ```bash
-python userbot.py -l 100 https://t.me/channel_name
+python parser.py -l 100 https://t.me/channel_name
 ```
 
 JSON export:
 
 ```bash
-python userbot.py -f json -o beus_research https://t.me/channel_name
+python parser.py -f json -o beus_research https://t.me/channel_name
 ```
 
 Удалить emoji:
 
 ```bash
-python userbot.py -j https://t.me/channel_name
+python parser.py -j https://t.me/channel_name
 ```
 
 Порядок от старых к новым:
 
 ```bash
-python userbot.py -r https://t.me/channel_name
+python parser.py -r https://t.me/channel_name
 ```
 
 Вывод JSON в stdout (для пайпинга или быстрого просмотра):
 
 ```bash
-python userbot.py --stdout -f json -l 10 https://t.me/channel_name
+python parser.py --stdout -f json -l 10 https://t.me/channel_name
 ```
 
 Несколько каналов за один запуск:
 
 ```bash
-python userbot.py -f json -o combined https://t.me/channel1 https://t.me/channel2
+python parser.py -f json -o combined https://t.me/channel1 https://t.me/channel2
 ```
 
 Комбинированный пример:
 
 ```bash
-python userbot.py -s 01.01.2024 -e 31.12.2024 -l 500 -f json -o export_2024 -j -r https://t.me/channel_name
+python parser.py -s 01.01.2024 -e 31.12.2024 -l 500 -f json -o export_2024 -j -r https://t.me/channel_name
 ```
 
 Парсинг по ключевому слову:
 
 ```bash
-python userbot.py https://t.me/channel_name -e 01.02.2026 -o grace_info -f json -j -k GRACE
+python parser.py https://t.me/channel_name -e 01.02.2026 -o grace_info -f json -j -k GRACE
 ```
 
 ## Аргументы CLI

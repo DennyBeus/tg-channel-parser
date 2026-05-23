@@ -103,13 +103,13 @@ Supported schemes: `http`, `socks5`. `PROXY_USERNAME` and `PROXY_PASSWORD` are o
 ### 1) Authorization (first run)
 
 ```bash
-python userbot.py --auth
+python parser.py --auth
 ```
 
 ### 2) Basic channel parsing
 
 ```bash
-python userbot.py https://t.me/channel_name
+python parser.py https://t.me/channel_name
 ```
 
 ### 3) With option examples
@@ -117,55 +117,55 @@ python userbot.py https://t.me/channel_name
 By date range:
 
 ```bash
-python userbot.py -s 01.01.2024 -e 31.01.2024 https://t.me/channel_name
+python parser.py -s 01.01.2024 -e 31.01.2024 https://t.me/channel_name
 ```
 
 Message limit:
 
 ```bash
-python userbot.py -l 100 https://t.me/channel_name
+python parser.py -l 100 https://t.me/channel_name
 ```
 
 JSON export:
 
 ```bash
-python userbot.py -f json -o beus_research https://t.me/channel_name
+python parser.py -f json -o beus_research https://t.me/channel_name
 ```
 
 Remove emoji:
 
 ```bash
-python userbot.py -j https://t.me/channel_name
+python parser.py -j https://t.me/channel_name
 ```
 
 Order from oldest to newest:
 
 ```bash
-python userbot.py -r https://t.me/channel_name
+python parser.py -r https://t.me/channel_name
 ```
 
 Print JSON to stdout (for piping or quick preview):
 
 ```bash
-python userbot.py --stdout -f json -l 10 https://t.me/channel_name
+python parser.py --stdout -f json -l 10 https://t.me/channel_name
 ```
 
 Multiple channels in one run:
 
 ```bash
-python userbot.py -f json -o combined https://t.me/channel1 https://t.me/channel2
+python parser.py -f json -o combined https://t.me/channel1 https://t.me/channel2
 ```
 
 Combined example:
 
 ```bash
-python userbot.py -s 01.01.2024 -e 31.12.2024 -l 500 -f json -o export_2024 -j -r https://t.me/channel_name
+python parser.py -s 01.01.2024 -e 31.12.2024 -l 500 -f json -o export_2024 -j -r https://t.me/channel_name
 ```
 
 Keywords example:
 
 ```bash
-python userbot.py https://t.me/channel_name -e 01.02.2026 -o grace_info -f json -j -k GRACE
+python parser.py https://t.me/channel_name -e 01.02.2026 -o grace_info -f json -j -k GRACE
 ```
 
 ## CLI arguments
