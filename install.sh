@@ -28,15 +28,11 @@ EOF
 echo -e "\033[0;90m                        developed by DennyBeus\033[0m"
 echo ""
 
-# ── 1. Проверка ОС ───────────────────────────────────
-if [ -f /etc/os-release ]; then
-    . /etc/os-release
-    if [[ "$ID" != "ubuntu" && "$ID" != "debian" && "$ID_LIKE" != *"debian"* ]]; then
-        warn "Этот скрипт оптимизирован для Ubuntu/Debian. Продолжаем на свой страх и риск."
-    fi
-else
-    warn "Не удалось определить ОС. Продолжаем..."
+# ── 1. Проверка зависимостей ──────────────────────────
+if ! command -v curl &>/dev/null; then
+    error "Требуется 'curl', но он не установлен.\n  Ubuntu/Debian: apt-get install -y curl\n  CentOS/RHEL:   yum install -y curl\n  Fedora:        dnf install -y curl"
 fi
+success "Зависимости в порядке."
 
 # ── 2. Установка Docker ───────────────────────────────
 if command -v docker &>/dev/null; then
