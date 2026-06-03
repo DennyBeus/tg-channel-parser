@@ -127,7 +127,7 @@ async def cmd_start(message: Message, state: FSMContext):
         [InlineKeyboardButton(text="Помощь", callback_data="menu_help")],
     ])
     await message.answer(
-        "Telegram Channel Parser\n\nВыбери действие или используй /parse напрямую:",
+        "grabogram\n\nВыбери действие или используй /parse напрямую:",
         reply_markup=keyboard,
     )
 

@@ -1,4 +1,4 @@
-# Telegram Channel Parser
+# grabogram
 
 [English](README.md) | [Русский](README.ru.md)
 

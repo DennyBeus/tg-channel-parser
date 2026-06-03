@@ -1,8 +1,8 @@
 #!/bin/bash
 set -e
 
-REPO_URL="https://github.com/DennyBeus/tg-channel-parser.git"
-INSTALL_DIR="tg-channel-parser"
+REPO_URL="https://github.com/DennyBeus/grabogram.git"
+INSTALL_DIR="grabogram"
 
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -18,14 +18,14 @@ error()   { echo -e "${RED}[ERROR]${NC} $1"; exit 1; }
 echo ""
 echo -e "\033[1;36m"
 cat << 'EOF'
- ██████╗ ██████╗ ███████╗███╗   ██╗    ██████╗  █████╗ ██████╗ ███████╗███████╗██████╗
-██╔═══██╗██╔══██╗██╔════╝████╗  ██║    ██╔══██╗██╔══██╗██╔══██╗██╔════╝██╔════╝██╔══██╗
-██║   ██║██████╔╝█████╗  ██╔██╗ ██║    ██████╔╝███████║██████╔╝███████╗█████╗  ██████╔╝
-██║   ██║██╔═══╝ ██╔══╝  ██║╚██╗██║    ██╔═══╝ ██╔══██║██╔══██╗╚════██║██╔══╝  ██╔══██╗
-╚██████╔╝██║     ███████╗██║ ╚████║    ██║     ██║  ██║██║  ██║███████║███████╗██║  ██║
- ╚═════╝ ╚═╝     ╚══════╝╚═╝  ╚═══╝   ╚═╝     ╚═╝  ╚═╝╚═╝  ╚═╝╚══════╝╚══════╝╚═╝  ╚═╝
+ ██████╗ ██████╗  █████╗ ██████╗  ██████╗  ██████╗ ██████╗  █████╗ ███╗   ███╗
+██╔════╝ ██╔══██╗██╔══██╗██╔══██╗██╔═══██╗██╔════╝ ██╔══██╗██╔══██╗████╗ ████║
+██║  ███╗██████╔╝███████║██████╔╝██║   ██║██║  ███╗██████╔╝███████║██╔████╔██║
+██║   ██║██╔══██╗██╔══██║██╔══██╗██║   ██║██║   ██║██╔══██╗██╔══██║██║╚██╔╝██║
+╚██████╔╝██║  ██║██║  ██║██████╔╝╚██████╔╝╚██████╔╝██║  ██║██║  ██║██║ ╚═╝ ██║
+ ╚═════╝ ╚═╝  ╚═╝╚═╝  ╚═╝╚═════╝  ╚═════╝  ╚═════╝ ╚═╝  ╚═╝╚═╝  ╚═╝╚═╝     ╚═╝
 EOF
-echo -e "\033[0;90m                   Telegram Channel Parser - developed by DennyBeus\033[0m"
+echo -e "\033[0;90m                        grabogram - developed by DennyBeus\033[0m"
 echo ""
 
 # ── 1. Проверка ОС ───────────────────────────────────
@@ -152,13 +152,13 @@ docker compose up -d
 # Ожидание запуска
 info "Жду запуска контейнера..."
 for i in $(seq 1 15); do
-    STATUS=$(docker inspect --format='{{.State.Status}}' tg-parser 2>/dev/null || echo "not_found")
+    STATUS=$(docker inspect --format='{{.State.Status}}' grabogram 2>/dev/null || echo "not_found")
     if [ "$STATUS" = "running" ]; then
         success "Контейнер запущен."
         break
     fi
     if [ "$i" -eq 15 ]; then
-        error "Контейнер не запустился. Проверь: docker logs tg-parser"
+        error "Контейнер не запустился. Проверь: docker logs grabogram"
     fi
     sleep 2
 done
@@ -174,7 +174,7 @@ echo "в приложение или SMS. После этого переавто
 echo "делать прямо через бота командой /auth (без входа на сервер)."
 echo ""
 read -r -p "Готов? Нажми Enter для начала авторизации..."
-docker exec -it tg-parser python parser.py --auth
+docker exec -it grabogram python parser.py --auth
 
 echo ""
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
@@ -192,7 +192,7 @@ echo "Пример:"
 echo "  /parse https://t.me/durov -s 01.01.2024 -e 31.12.2024 -f json -k bitcoin"
 echo ""
 echo "Полезные команды сервера:"
-echo "  docker logs tg-parser        — логи"
+echo "  docker logs grabogram        — логи"
 echo "  docker compose restart       — перезапуск"
 echo "  docker compose down          — остановка"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"

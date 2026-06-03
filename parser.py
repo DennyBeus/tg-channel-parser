@@ -292,7 +292,7 @@ def save_results(messages: list, filename: str, fmt: str):
 # ---------------- Execution ----------------
 async def main():
     parser = argparse.ArgumentParser(
-        description="Telegram Channel Parser CLI",
+        description="grabogram CLI",
         usage="userbot.py [-h] [-a] [-s START] [-e END] [-o OUTPUT] [-f {txt,json}] [-l LIMIT] [-r] [-j] [-k WORD [WORD ...]] [--stdout] [channel ...]",
         add_help=False,
     )
