@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="760" height="150" font-family="'Courier New',Courier,monospace" font-size="15" xml:space="preserve">
+  <style>
+    .logo { fill: #00cdcd; white-space: pre; }
+    .by   { fill: #888888; white-space: pre; }
+  </style>
+  <text class="logo" x="0" y="20"> ██████╗ ██████╗  █████╗ ██████╗  ██████╗  ██████╗ ██████╗  █████╗ ███╗   ███╗</text>
+  <text class="logo" x="0" y="38">██╔════╝ ██╔══██╗██╔══██╗██╔══██╗██╔═══██╗██╔════╝ ██╔══██╗██╔══██╗████╗ ████║</text>
+  <text class="logo" x="0" y="56">██║  ███╗██████╔╝███████║██████╔╝██║   ██║██║  ███╗██████╔╝███████║██╔████╔██║</text>
+  <text class="logo" x="0" y="74">██║   ██║██╔══██╗██╔══██║██╔══██╗██║   ██║██║   ██║██╔══██╗██╔══██║██║╚██╔╝██║</text>
+  <text class="logo" x="0" y="92">╚██████╔╝██║  ██║██║  ██║██████╔╝╚██████╔╝╚██████╔╝██║  ██║██║  ██║██║ ╚═╝ ██║</text>
+  <text class="logo" x="0" y="110"> ╚═════╝ ╚═╝  ╚═╝╚═╝  ╚═╝╚═════╝  ╚═════╝  ╚═════╝ ╚═╝  ╚═╝╚═╝  ╚═╝╚═╝     ╚═╝</text>
+  <text class="by"   x="0" y="134">                        developed by DennyBeus</text>
+</svg>
