@@ -126,7 +126,12 @@ async def cmd_start(message: Message, state: FSMContext):
         [InlineKeyboardButton(text="Помощь", callback_data="menu_help")],
     ])
     await message.answer(
-        "<b>grabogram is here</b>\n\nВыбери действие:\n/parse - начать парсинг\n/auth — обновить сессию\n/cancel — отменить текущее действие",
+        "<b>grabogram is here</b>\n\n"
+        "<b>Выбери действие:</b>\n"
+        "/parse — начать парсинг\n"
+        "/auth — обновить сессию\n"
+        "/cancel — отменить текущее действие",
+        parse_mode="HTML",
         reply_markup=keyboard,
     )
 
@@ -137,11 +142,11 @@ async def cb_help(callback: CallbackQuery):
         "<b>Прямая команда:</b>\n"
         "<code>/parse https://t.me/channel -s 01.01.2024 -e 31.12.2024 -f json -k bitcoin</code>\n\n"
         "<b>Параметры:</b>\n"
-        "-s DATE — начало (ДД.ММ.ГГГГ)\n"
-        "-e DATE — конец (ДД.ММ.ГГГГ)\n"
-        "-f txt|json — формат (по умолч. txt)\n"
-        "-l N — лимит сообщений\n"
-        "-k СЛОВА — ключевые слова через пробел\n"
+        "-s [DATE] — начало (ДД.ММ.ГГГГ)\n"
+        "-e [DATE] — конец (ДД.ММ.ГГГГ)\n"
+        "-f [txt|json] — формат вывода (по умолчанию txt)\n"
+        "-l [NUM] — лимит сообщений\n"
+        "-k [WORDS] — ключевые слова через пробел\n"
         "-j — убрать эмодзи\n"
         "-r — от старых к новым\n\n"
         "<b>Другие команды:</b>\n"
