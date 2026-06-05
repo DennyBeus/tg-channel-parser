@@ -123,11 +123,10 @@ async def run_parse_job(bot: Bot, chat_id: int, parser_args: list[str]) -> None:
 async def cmd_start(message: Message, state: FSMContext):
     await state.clear()
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="Парсить канал", callback_data="menu_parse")],
         [InlineKeyboardButton(text="Помощь", callback_data="menu_help")],
     ])
     await message.answer(
-        "grabogram\n\nВыбери действие или используй /parse напрямую:",
+        "<b>grabogram is here</b>\n\nВыбери действие:\n/parse - начать парсинг\n/auth — обновить сессию\n/cancel — отменить текущее действие",
         reply_markup=keyboard,
     )
 
@@ -150,13 +149,6 @@ async def cb_help(callback: CallbackQuery):
         "/cancel — отменить текущее действие"
     )
     await callback.message.answer(text, parse_mode="HTML")
-    await callback.answer()
-
-
-@router.callback_query(OwnerFilter(), F.data == "menu_parse")
-async def cb_menu_parse(callback: CallbackQuery, state: FSMContext):
-    await state.set_state(ParseStates.channel)
-    await callback.message.answer("Отправь URL канала (например: https://t.me/durov)")
     await callback.answer()
 
 
