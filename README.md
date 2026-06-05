@@ -1,4 +1,4 @@
-<img src=".github/logo.svg" alt="grabogram — developed by DennyBeus" width="780">
+<img src=".github/logo.svg" alt="grabogram — developed by DennyBeus" width="800">
 
 # grabogram
 
@@ -83,8 +83,14 @@ Prefer doing it the classic way? Clone the repo and run the script by hand — i
 
 ```bash
 git clone https://github.com/DennyBeus/grabogram.git
+```
+```bash
 cd grabogram
+```
+```bash
 chmod +x install.sh
+```
+```bash
 ./install.sh
 ```
 
