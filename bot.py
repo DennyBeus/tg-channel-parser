@@ -53,11 +53,11 @@ class OwnerFilter(BaseFilter):
 class ParseStates(StatesGroup):
     channel = State()
     dates = State()
-    fmt = State()
     limit = State()
-    no_emoji = State()
-    reverse = State()
     keywords = State()
+    reverse = State()
+    no_emoji = State()
+    fmt = State()
 
 
 class AuthStates(StatesGroup):
@@ -190,14 +190,7 @@ async def state_channel(message: Message, state: FSMContext):
 @router.callback_query(OwnerFilter(), F.data == "skip_dates", ParseStates.dates)
 async def cb_skip_dates(callback: CallbackQuery, state: FSMContext):
     await state.update_data(start=None, end=None)
-    await state.set_state(ParseStates.fmt)
-    keyboard = InlineKeyboardMarkup(inline_keyboard=[
-        [
-            InlineKeyboardButton(text="txt", callback_data="fmt_txt"),
-            InlineKeyboardButton(text="json", callback_data="fmt_json"),
-        ],
-    ])
-    await callback.message.answer("Выбери формат вывода:", reply_markup=keyboard)
+    await _ask_limit(callback.message, state)
     await callback.answer()
 
 
@@ -210,35 +203,24 @@ async def state_dates(message: Message, state: FSMContext):
     else:
         await message.answer("Неверный формат. Введи: 01.01.2024-31.12.2024 или нажми «Пропустить».")
         return
-    await state.set_state(ParseStates.fmt)
-    keyboard = InlineKeyboardMarkup(inline_keyboard=[
-        [
-            InlineKeyboardButton(text="txt", callback_data="fmt_txt"),
-            InlineKeyboardButton(text="json", callback_data="fmt_json"),
-        ],
-    ])
-    await message.answer("Выбери формат вывода:", reply_markup=keyboard)
+    await _ask_limit(message, state)
 
 
-@router.callback_query(OwnerFilter(), F.data.in_({"fmt_txt", "fmt_json"}), ParseStates.fmt)
-async def cb_fmt(callback: CallbackQuery, state: FSMContext):
-    fmt = callback.data.split("_")[1]
-    await state.update_data(fmt=fmt)
+async def _ask_limit(message: Message, state: FSMContext):
     await state.set_state(ParseStates.limit)
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="Пропустить", callback_data="skip_limit")],
     ])
-    await callback.message.answer(
+    await message.answer(
         "Лимит сообщений на канал? Введи число.\nИли нажми «Пропустить».",
         reply_markup=keyboard,
     )
-    await callback.answer()
 
 
 @router.callback_query(OwnerFilter(), F.data == "skip_limit", ParseStates.limit)
 async def cb_skip_limit(callback: CallbackQuery, state: FSMContext):
     await state.update_data(limit=None)
-    await _ask_no_emoji(callback.message, state)
+    await _ask_keywords(callback.message, state)
     await callback.answer()
 
 
@@ -249,25 +231,31 @@ async def state_limit(message: Message, state: FSMContext):
         await message.answer("Введи целое число или нажми «Пропустить».")
         return
     await state.update_data(limit=text)
-    await _ask_no_emoji(message, state)
+    await _ask_keywords(message, state)
 
 
-async def _ask_no_emoji(message: Message, state: FSMContext):
-    await state.set_state(ParseStates.no_emoji)
+async def _ask_keywords(message: Message, state: FSMContext):
+    await state.set_state(ParseStates.keywords)
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
-        [
-            InlineKeyboardButton(text="Удалить", callback_data="emoji_remove"),
-            InlineKeyboardButton(text="Оставить", callback_data="emoji_keep"),
-        ],
+        [InlineKeyboardButton(text="Пропустить", callback_data="skip_keywords")],
     ])
-    await message.answer("Emoji в тексте?", reply_markup=keyboard)
+    await message.answer(
+        "Введи ключевые слова через пробел (фильтр постов).\nИли нажми «Пропустить».",
+        reply_markup=keyboard,
+    )
 
 
-@router.callback_query(OwnerFilter(), F.data.in_({"emoji_remove", "emoji_keep"}), ParseStates.no_emoji)
-async def cb_no_emoji(callback: CallbackQuery, state: FSMContext):
-    await state.update_data(no_emoji=(callback.data == "emoji_remove"))
+@router.callback_query(OwnerFilter(), F.data == "skip_keywords", ParseStates.keywords)
+async def cb_skip_keywords(callback: CallbackQuery, state: FSMContext):
+    await state.update_data(keywords=None)
     await _ask_reverse(callback.message, state)
     await callback.answer()
+
+
+@router.message(OwnerFilter(), ParseStates.keywords)
+async def state_keywords(message: Message, state: FSMContext):
+    await state.update_data(keywords=message.text.strip())
+    await _ask_reverse(message, state)
 
 
 async def _ask_reverse(message: Message, state: FSMContext):
@@ -284,28 +272,41 @@ async def _ask_reverse(message: Message, state: FSMContext):
 @router.callback_query(OwnerFilter(), F.data.in_({"order_old", "order_new"}), ParseStates.reverse)
 async def cb_reverse(callback: CallbackQuery, state: FSMContext):
     await state.update_data(reverse=(callback.data == "order_old"))
-    await state.set_state(ParseStates.keywords)
-    keyboard = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="Пропустить", callback_data="skip_keywords")],
-    ])
-    await callback.message.answer(
-        "Введи ключевые слова через пробел (фильтр постов).\nИли нажми «Пропустить».",
-        reply_markup=keyboard,
-    )
+    await _ask_no_emoji(callback.message, state)
     await callback.answer()
 
 
-@router.callback_query(OwnerFilter(), F.data == "skip_keywords", ParseStates.keywords)
-async def cb_skip_keywords(callback: CallbackQuery, state: FSMContext):
-    await state.update_data(keywords=None)
+async def _ask_no_emoji(message: Message, state: FSMContext):
+    await state.set_state(ParseStates.no_emoji)
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[
+        [
+            InlineKeyboardButton(text="Удалить", callback_data="emoji_remove"),
+            InlineKeyboardButton(text="Оставить", callback_data="emoji_keep"),
+        ],
+    ])
+    await message.answer("Emoji в тексте?", reply_markup=keyboard)
+
+
+@router.callback_query(OwnerFilter(), F.data.in_({"emoji_remove", "emoji_keep"}), ParseStates.no_emoji)
+async def cb_no_emoji(callback: CallbackQuery, state: FSMContext):
+    await state.update_data(no_emoji=(callback.data == "emoji_remove"))
+    await state.set_state(ParseStates.fmt)
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[
+        [
+            InlineKeyboardButton(text="txt", callback_data="fmt_txt"),
+            InlineKeyboardButton(text="json", callback_data="fmt_json"),
+        ],
+    ])
+    await callback.message.answer("Выбери формат вывода:", reply_markup=keyboard)
+    await callback.answer()
+
+
+@router.callback_query(OwnerFilter(), F.data.in_({"fmt_txt", "fmt_json"}), ParseStates.fmt)
+async def cb_fmt(callback: CallbackQuery, state: FSMContext):
+    fmt = callback.data.split("_")[1]
+    await state.update_data(fmt=fmt)
     await _run_from_state(callback.message, state)
     await callback.answer()
-
-
-@router.message(OwnerFilter(), ParseStates.keywords)
-async def state_keywords(message: Message, state: FSMContext):
-    await state.update_data(keywords=message.text.strip())
-    await _run_from_state(message, state)
 
 
 async def _run_from_state(message: Message, state: FSMContext):
