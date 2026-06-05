@@ -5,14 +5,14 @@
 ██║   ██║██╔══██╗██╔══██║██╔══██╗██║   ██║██║   ██║██╔══██╗██╔══██║██║╚██╔╝██║
 ╚██████╔╝██║  ██║██║  ██║██████╔╝╚██████╔╝╚██████╔╝██║  ██║██║  ██║██║ ╚═╝ ██║
  ╚═════╝ ╚═╝  ╚═╝╚═╝  ╚═╝╚═════╝  ╚═════╝  ╚═════╝ ╚═╝  ╚═╝╚═╝  ╚═╝╚═╝     ╚═╝
-                        developed by DennyBeus
+                                                        developed by DennyBeus
 ```
 
 # grabogram
 
 [English](README.md) | [Русский](README.ru.md)
 
-A Telegram channel parser that lives on **your** server and is driven entirely from a **Telegram bot**. No SSH, no terminal gymnastics — you talk to a bot, the bot does the parsing, and a ready-to-go `txt` or `json` file lands right back in your chat.
+A Telegram channel parser that lives on **your** server and is driven entirely from a **Telegram bot**. Set it up once, and from then on there's no terminal to fuss with — you talk to a bot, the bot does the parsing, and a ready-to-go `txt` or `json` file lands right back in your chat.
 
 Under the hood it's still the same honest CLI parser that's always been here — the bot is just a friendly shell wrapped around it. So if you're the kind of person who likes piping JSON into n8n or a shell script, that path is still wide open (see [Power-user mode: the raw CLI](#power-user-mode-the-raw-cli)).
 
@@ -69,7 +69,7 @@ Under the hood the parser:
 
 You'll need three things:
 
-1. **A VPS** (any cheap Ubuntu/Debian box will do) with SSH access. You'll run the installer there *once*.
+1. **A VPS** (any cheap Ubuntu/Debian box will do) where you can run a couple of commands. You'll run the installer there *once*.
 2. **Telegram API credentials** — `API_ID` and `API_HASH`. Grab them at [my.telegram.org](https://my.telegram.org/auth) → *API development tools* → create an application.
 3. **A bot token** — open [@BotFather](https://t.me/BotFather), send `/newbot`, follow the prompts, and copy the token (looks like `123456789:ABC-DEF1234...`).
 
@@ -81,13 +81,22 @@ And the **phone number** of the account that will actually do the reading — ch
 
 ## Installation (the easy way)
 
-SSH into your server and run the installer:
+On your server, run the installer in one line:
 
 ```bash
 bash <(curl -fsSL https://raw.githubusercontent.com/DennyBeus/grabogram/main/install.sh)
 ```
 
-That's it. The script will:
+Prefer doing it the classic way? Clone the repo and run the script by hand — it does exactly the same thing:
+
+```bash
+git clone https://github.com/DennyBeus/grabogram.git
+cd grabogram
+chmod +x install.sh
+./install.sh
+```
+
+Either way, the script will:
 
 1. Check for `curl` and **install Docker** if it isn't already there.
 2. **Clone the repository** (or reuse the folder if you're already inside it).
@@ -152,14 +161,14 @@ The flags mirror the CLI exactly:
 
 ### Re-authorizing without touching the server
 
-Telegram sessions don't last forever. When yours expires, **you don't need to SSH anywhere** — just send `/auth` to the bot:
+Telegram sessions don't last forever. When yours expires, **you don't need to go back to the server at all** — just send `/auth` to the bot:
 
 1. The bot requests a fresh login code for your number.
 2. Telegram sends the code; you type it in (format `1 2 3 4 5` — spaces are fine, they're stripped).
 3. If you have 2FA enabled, it'll ask for your password next.
 4. Done — session refreshed.
 
-This was the whole motivation for the bot: never again copy-paste login codes over an SSH session.
+This was the whole motivation for the bot: never again copy-paste login codes through a server console.
 
 ### Switching language
 
