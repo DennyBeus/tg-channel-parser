@@ -1,4 +1,4 @@
-<img src=".github/logo.svg" alt="grabogram — developed by DennyBeus" width="760">
+<img src=".github/logo.svg" alt="grabogram — developed by DennyBeus" width="780">
 
 # grabogram
 

@@ -9,5 +9,5 @@
   <text class="logo" x="0" y="74">██║   ██║██╔══██╗██╔══██║██╔══██╗██║   ██║██║   ██║██╔══██╗██╔══██║██║╚██╔╝██║</text>
   <text class="logo" x="0" y="92">╚██████╔╝██║  ██║██║  ██║██████╔╝╚██████╔╝╚██████╔╝██║  ██║██║  ██║██║ ╚═╝ ██║</text>
   <text class="logo" x="0" y="110"> ╚═════╝ ╚═╝  ╚═╝╚═╝  ╚═╝╚═════╝  ╚═════╝  ╚═════╝ ╚═╝  ╚═╝╚═╝  ╚═╝╚═╝     ╚═╝</text>
-  <text class="by"   x="0" y="134">                        developed by DennyBeus</text>
+  <text class="by"   x="693" y="134" text-anchor="end">developed by DennyBeus</text>
 </svg>
