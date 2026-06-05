@@ -1,5 +1,3 @@
-version: "3.9"
-
 services:
   grabogram:
     build: .
@@ -8,3 +6,10 @@ services:
     env_file: .env
     volumes:
       - ./data:/app/data
+#     networks:
+#       tinc_net:
+#         ipv4_address:
+
+# networks:
+#   tinc_net:
+#     external: true
