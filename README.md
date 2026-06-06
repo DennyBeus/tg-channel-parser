@@ -19,6 +19,7 @@ Special thanks to the author of [`kurigram`](https://github.com/KurimuzonAkuma/k
 ## Table of contents
 
 - [What you get](#what-you-get)
+- [How I use it](#how-i-use-it)
 - [Before you start](#before-you-start)
 - [Installation (the easy way)](#installation-the-easy-way)
 - [Using the bot](#using-the-bot)
@@ -54,6 +55,14 @@ Under the hood the parser:
 - pulls inline URLs out of `text_link` entities and inserts them right after the anchor text (with correct emoji/UTF‑16 offset handling, which is the fiddly part);
 - saves date, text, views, total reaction count, the post link, and the source channel;
 - can parse several channels in one run, cap the number of messages, drop emoji, and filter by keywords.
+
+---
+
+## How I use it
+
+My main workflow is research: I parse a group of channels by keyword, then forward the JSON output to an AI research agent (also living in Telegram) and ask it to go deeper on the topic. The agent gets dense, focused material instead of a bloated context, which tends to produce much sharper analysis.
+
+The other thing is that Telegram carries a lot of signal that a standard web search simply won't surface — niche communities, early takes, things that never make it to indexed pages. That's the gap this parser fills.
 
 ---
 
